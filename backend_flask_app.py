@@ -3,7 +3,7 @@ from flask_cors import CORS
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 import os
-import time
+from flask import send_file
 
 app = Flask(__name__)
 CORS(app)
@@ -47,11 +47,22 @@ def generate_pdf():
         # Temporarily skip removal
         # os.remove(image_path)
 
-        return jsonify({ "pdfUrl": f"/static/{pdf_filename}" })
+        return jsonify({ "pdfUrl": f"/download_pdf/{pdf_filename}" })
 
     except Exception as e:
         print("❌ ERROR during PDF generation:", e)
+
         return jsonify({ "error": "Server error during PDF creation." }), 500
+
+from flask import send_file
+
+@app.route("/download_pdf/<filename>")
+def download_pdf(filename):
+    pdf_path = os.path.join("static", filename)
+    try:
+        return send_file(pdf_path, as_attachment=True, mimetype="application/pdf")
+    except FileNotFoundError:
+        return jsonify({"error": "PDF not found"}), 404
 
 
 if __name__ == "__main__":
