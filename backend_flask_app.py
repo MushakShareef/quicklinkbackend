@@ -26,14 +26,20 @@ def generate_pdf():
         from reportlab.pdfgen import canvas
         from reportlab.lib.pagesizes import letter
 
-        pdf_filename = os.path.splitext(image_file.filename)[0] + ".pdf"
+        # pdf_filename = os.path.splitext(image_file.filename)[0] + ".pdf"
+        pdf_filename = "QuickLink_" + os.path.splitext(image_file.filename)[0] + ".pdf"
         pdf_path = os.path.join("static", pdf_filename)
 
         c = canvas.Canvas(pdf_path, pagesize=letter)
         width, height = letter
 
         c.drawImage(image_path, 0, 0, width=width, height=height)
+        
+        c.setFont("Helvetica", 12)
+        c.drawString(50, 50, f"Click anywhere to visit: {link}")
+
         c.linkURL(link, (0, 0, width, height), relative=0)
+
         c.showPage()
         c.save()
 
