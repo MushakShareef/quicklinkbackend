@@ -1,69 +1,54 @@
-# backend/app.py
+# quicklinkbackend/app.py
 
-from flask import Flask, request, jsonify, send_file, redirect
+from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
 import os
+from PIL import Image
+import io
 import uuid
-import json
 
 app = Flask(__name__)
 CORS(app)
 
-# Store short links in memory or file (later use DB)
-URL_STORE_PATH = "short_links.json"
-if not os.path.exists(URL_STORE_PATH):
-    with open(URL_STORE_PATH, 'w') as f:
-        json.dump({}, f)
+# Ensure static folder exists
+os.makedirs("static", exist_ok=True)
 
-
-# Helper to save short link
-def save_link(slug, long_url):
-    with open(URL_STORE_PATH, 'r') as f:
-        data = json.load(f)
-    data[slug] = long_url
-    with open(URL_STORE_PATH, 'w') as f:
-        json.dump(data, f)
-
-
-# Helper to get long URL
-def get_long_url(slug):
-    with open(URL_STORE_PATH, 'r') as f:
-        data = json.load(f)
-    return data.get(slug)
-
-
-@app.route("/api/shorten", methods=["POST"])
-def shorten():
-    data = request.form
-    long_url = data.get("longUrl")
-    custom_name = data.get("customName", "")
+@app.route("/generate_pdf", methods=["POST"])
+def generate_pdf():
+    link = request.form.get("link")
     file = request.files.get("image")
 
-    if not long_url:
-        return jsonify({"error": "Missing long URL"}), 400
+    if not link or not file:
+        return jsonify({"error": "Missing link or image"}), 400
 
-    slug = custom_name if custom_name else uuid.uuid4().hex[:6]
+    # Open image using PIL
+    img = Image.open(file.stream)
+    img_width, img_height = img.size
 
-    # Save the link
-    save_link(slug, long_url)
+    # Convert pixel size to PDF point size
+    pdf_filename = f"{uuid.uuid4().hex}.pdf"
+    pdf_path = os.path.join("static", pdf_filename)
 
-    # Save image if present
-    if file:
-        img_path = os.path.join("static", f"{slug}.jpg")
-        file.save(img_path)
-        # PDF generation will be added later
+    # Create PDF canvas with image size
+    c = canvas.Canvas(pdf_path, pagesize=(img_width, img_height))
 
-    return jsonify({"shortUrl": f"/r/{slug}", "slug": slug}), 200
+    # Draw the image at (0,0)
+    img_byte = io.BytesIO()
+    img.save(img_byte, format='PNG')
+    img_byte.seek(0)
+    c.drawImage(img_byte, 0, 0, width=img_width, height=img_height)
 
+    # Add invisible clickable link overlay
+    c.linkURL(link, (0, 0, img_width, img_height), relative=0)
 
-@app.route("/r/<slug>")
-def redirect_link(slug):
-    long_url = get_long_url(slug)
-    if long_url:
-        return redirect(long_url)
-    return "Invalid or expired link", 404
+    c.showPage()
+    c.save()
 
+    return jsonify({
+        "pdfUrl": f"/static/{pdf_filename}"
+    })
 
 if __name__ == "__main__":
-    os.makedirs("static", exist_ok=True)
     app.run(debug=True)
