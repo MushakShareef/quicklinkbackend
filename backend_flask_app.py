@@ -6,7 +6,11 @@ import os
 from PIL import Image
 import io
 import uuid
-print("reportlab is working!")
+
+
+# print("reportlab is working!")
+
+
 
 app = Flask(__name__)
 CORS(app)
